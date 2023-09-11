@@ -1,0 +1,119 @@
+---
+title: "ADS 503 Final Project"
+author: "Group1: Sean Torres, George Garcia, and Anusia Edward"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+air <- read.csv("~/Desktop/Shunyi.csv")
+```
+
+```{r}
+predictors <- subset(air, select = -PM2.5)
+outcome <- subset(air, select = PM2.5)
+#library(caret) 
+#set.seed(1)
+#trainrws <- createDataPartition(air$PM2.5, p = 0.8, list = FALSE)
+sum(is.na(outcome))
+```
+When trying to split the data to avoid data leakage, the data wouldn't split because there were NA's and missing values in the outcome variable. To fix this, the outcome variable is going to be filled using a knn imputation. Then the data will be split and the predictor variables for the test and train sets will be filled. 
+
+```{r}
+library(VIM)
+outcome <- kNN(outcome$PM2.5)
+outcome <- subset(outcome, select = )
+```
+
+
+```{r, message=FALSE}
+sum(is.na(air)) # checking for NAs 
+library(VIM)
+air.knn <- kNN(air) # using 5KNN to impute missing values 
+# removing the imputation variables that were added 
+air.knn <- subset(air.knn, select = year:station)
+sum(is.na(air.knn)) # double checking NAs 
+```
+
+```{r, message=FALSE}
+# splitting predictors and outcome variables 
+x <- subset(air.knn, select = -c(PM2.5))
+y <- subset(air.knn, select = PM2.5)
+library(caret)
+nZV.x <- nearZeroVar(x)# checking near zero variance 
+x <- x[, -nZV.x]# removal of nZV 
+# splitting the data before preprocessing to avoid data leakage
+library(caret) 
+set.seed(1)
+trainset <- createDataPartition(air.knn$PM2.5, p = 0.8, list = FALSE)
+x.train <- x[trainset, ]
+y.train <- y[trainset, ]
+y.train <- as.data.frame(y.train)
+x.test <- x[-trainset, ]
+y.test <- y[-trainset, ]
+y.test <- as.data.frame(y.test)
+```
+
+```{r, message=FALSE}
+# checking distributions
+par(mfrow = c(2,3))
+hist(x.train$year,xlab = "Year")
+hist(x.train$month, xlab = "Month")
+hist(x.train$day, xlab = "Day")
+hist(x.train$hour, xlab = "Hour")
+hist(x.train$PM10, xlab = "PM10")
+hist(x.train$SO2, xlab = "SO2")
+par(mfrow = c(2,4))
+hist(x.train$NO2, xlab = "NO2")
+hist(x.train$CO, xlab = "CO")
+hist(x.train$O3, xlab = "O3")
+hist(x.train$TEMP, xlab = "Temperature")
+hist(x.train$PRES, xlab = "Pressure")
+hist(x.train$DEWP, xlab = "Dew point Temp")
+hist(x.train$WSPM, xlab = "Wind Speed")
+
+```
+
+```{r, message=FALSE}
+# box-cox, center, scaling 
+trans <- preProcess(x.train, 
+                       method = c("BoxCox", "center", "scale"))
+x.trainp <- predict(trans, x.train)
+trans1 <- preProcess(y.train, 
+                       method = c("BoxCox", "center", "scale"))
+y.trainp <- predict(trans1, y.train)
+trans2 <- preProcess(x.test, 
+                       method = c("BoxCox", "center", "scale"))
+x.testp <- predict(trans2, x.test)
+trans3 <- preProcess(y.test, 
+                       method = c("BoxCox", "center", "scale"))
+y.testp <- predict(trans3, y.test)
+# visualization of the transformations 
+par(mfrow = c(2,2))
+hist(x.train$CO, xlab = "CO")
+hist(x.trainp$CO, xlab = "CO after tranformations")
+hist(x.train$O3, xlab = "O3")
+hist(x.trainp$O3, xlab = "O3 after transformations")
+```
+
+```{r, message=FALSE}
+# checking for correlations 
+x.corr <- cor(x.trainp)
+library(corrplot)
+corrplot(x.corr, order = "hclust")
+hCorr <- findCorrelation(x.corr, cutoff = 0.75, exact = TRUE)
+x.trainpc <- x.trainp[, -hCorr]
+x.testpc <- x.testp[, -hCorr]
+x.corrCheck <- cor(x.trainpc)
+corrplot(x.corrCheck, order = "hclust")
+```
+
+```{r}
+# pca to determine the effective dimensions of the data 
+pca.x <- prcomp(x.trainpc, center = TRUE, scale. = TRUE)
+summary(pca.x)
+plot(pca.x, type = "l")
+```
